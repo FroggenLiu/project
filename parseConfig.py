@@ -22,10 +22,8 @@ class configParse:
             """
             data = {}
             p = re.compile(addrgrp_reg)
-            for i in re.finditer(p, f.read()):
-                #print(i.group('addrgrp'))
-                for j in re.finditer(content_reg ,i.group('addrgrp')):
-                    data[(j.group('grp_name').replace('"', '')).strip()] = re.sub(r'set\smember\s', '' ,j.group(3).strip())
+            for i in re.finditer(content_reg, re.search(addrgrp_reg, f.read()).group('addrgrp')):
+                data[(j.group('grp_name').replace('"', '')).strip()] = re.sub(r'set\smember\s', '', j.group(3).strip())
             #print(data)
             for k,v in data.items():
                 for v in re.split(r'\s', v.replace('"', '')):
