@@ -13,7 +13,7 @@ import getpass
 class configParse:
     def parseAddrgrp(path: str) -> None:
         addrgrp_reg = r'(?P<addrgrp>.*addrgrp(.*\n)*?.*end)'
-        contant_reg = r'(?P<grp_name>.\"\w+.*\")(?P<set>(.*\n)*?.*next)'
+        content_reg = r'(?P<grp_name>.\"\w+.*\")(?P<set>(.*\n)*?.*next)'
         with open(path, 'r', encoding='utf-8') as f:
             """
             1. named a non-capture in regex, the name is `addrgrp` by using regex `?p<namme>`.
@@ -24,7 +24,7 @@ class configParse:
             p = re.compile(addrgrp_reg)
             for i in re.finditer(p, f.read()):
                 #print(i.group('addrgrp'))
-                for j in re.finditer(contant_reg ,i.group('addrgrp')):
+                for j in re.finditer(content_reg ,i.group('addrgrp')):
                     data[(j.group('grp_name').replace('"', '')).strip()] = re.sub(r'set\smember\s', '' ,j.group(3).strip())
             #print(data)
             for k,v in data.items():
