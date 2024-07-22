@@ -38,9 +38,10 @@ class configParse:
         data = {}
         with open(path, 'r', encoding='utf-8') as f:
             for i in re.finditer(content_reg, re.search(fwpolicy_reg, f.read()).group('fw')):
-                #print(re.sub(r'edit\s', '', i.group('policy_id').strip()))
-                print(re.sub(r'set\s', '', i.group('set').strip()))
+                data[re.sub(r'edit\s', '', i.group('policy_id').strip())] = re.sub(r'\n', ',', re.sub(r'(.*set\s)|.*next', '', i.group('set').strip()))
+                #print(re.sub(r'\n', ',', re.sub(r'(.*set\s)|.*next', '', i.group('set').strip())))
                 #data[re.sub(r'edit\s', i.group('policy_id').strip())]
+        print(data)
                 
 
             
