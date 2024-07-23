@@ -27,26 +27,31 @@ class configParse:
                 data[(i.group('grp_name').replace('"', '')).strip()] = re.sub(r'set\smember\s', '', i.group(3).strip())
             #print(data)
             for k,v in data.items():
-                for v in re.split(r'\s', v.replace('"', '')):
-                    if re.match(r'^\d', v):
-                        ip, mask = re.split(r'\/', v)
+                for i in re.split(r'\s', v.replace('"', '')):
+                    if re.match(r'^\d', i):
+                        ip, mask = re.split(r'\/', i)
                         #TODO insert data into DB table `group` & pip install mysqldb
     
     def parse_firewall_policy(self, path: str) -> None:
-        fwpolicy_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
+        fwpolicy_block_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
         content_reg = r'(?P<policy_id>.edit\s\d.*)(?P<set>(.*\n)*?.*next)'
+        replace_set_next_reg = r'(.*set\s)|.*next'
+        replace_edit_reg = r'edit\s'
+        replace_prefix_reg = r'^(\w+\s|\w+\-\w+\s)'
+        split_space_reg = r'\s'
+        split_comma_reg = r'\,'
+        split_scape_reg = r'\n'
+
         data = {}
         with open(path, 'r', encoding='utf-8') as f:
-            for i in re.finditer(content_reg, re.search(fwpolicy_reg, f.read()).group('fw')):
-                data[re.sub(r'edit\s', '', i.group('policy_id').strip())] = re.sub(r'\n', ',', re.sub(r'(.*set\s)|.*next', '', i.group('set').strip()))
-                #print(re.sub(r'\n', ',', re.sub(r'(.*set\s)|.*next', '', i.group('set').strip())))
-                #data[re.sub(r'edit\s', i.group('policy_id').strip())]
-        print(data)
-                
-
-            
-
-
+            for id in re.finditer(content_reg, re.search(fwpolicy_block_reg, f.read()).group('fw')):
+                data[re.sub(replace_edit_reg, '', id.group('policy_id').strip())] = {}
+                for line in re.split(split_comma_reg, re.sub(split_scape_reg, ',', re.sub(replace_set_next_reg, '', id.group('set').strip()))):
+                    if re.split(split_space_reg, line)[0]:
+                        data[re.sub(replace_edit_reg, '', id.group('policy_id').strip())][re.split(split_space_reg, line)[0]] = re.sub(replace_prefix_reg, '', line)
+            print(data)
+    
+                 
         
 if __name__ == "__main__":
     #user = input("Please give DB User name: ")
@@ -56,5 +61,8 @@ if __name__ == "__main__":
     #    print('ERROR', error)
     #db = musql.connect(host='localhost', user='', passwd=pwd, db='pcloudfw', charset='utf8')
     sol = configParse()
-    sol.parse_firewall_policy('FW3.config')
+    #sol.parse_addrgrp('FW3.conf')
+    sol.parse_firewall_policy('FW3.conf')
+    
+    
 
