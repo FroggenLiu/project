@@ -38,19 +38,29 @@ class configParse:
         replace_set_next_reg = r'(.*set\s)|.*next'
         replace_edit_reg = r'edit\s'
         replace_prefix_reg = r'^(\w+\s|\w+\-\w+\s)'
+        replace_scape_reg = r'\n'
+        replace_apostrophe_reg = r'\"'
         split_space_reg = r'\s'
         split_comma_reg = r'\,'
-        split_scape_reg = r'\n'
 
         data = {}
         with open(path, 'r', encoding='utf-8') as f:
             for id in re.finditer(content_reg, re.search(fwpolicy_block_reg, f.read()).group('fw')):
                 data[re.sub(replace_edit_reg, '', id.group('policy_id').strip())] = {}
-                for line in re.split(split_comma_reg, re.sub(split_scape_reg, ',', re.sub(replace_set_next_reg, '', id.group('set').strip()))):
+                for line in re.split(split_comma_reg, re.sub(replace_scape_reg, ',', re.sub(replace_set_next_reg, '', id.group('set').strip()))):
                     if re.split(split_space_reg, line)[0]:
                         data[re.sub(replace_edit_reg, '', id.group('policy_id').strip())][re.split(split_space_reg, line)[0]] = re.sub(replace_prefix_reg, '', line)
-            print(data)
-    
+        #print(data)
+        for k, v in data.items():
+            if 'status' not in v or v.get('status') != 'disable':
+                print(v)
+                srcintf = re.sub(replace_apostrophe_reg, '', v.get('srcintf'))
+                dstintf = re.sub(replace_apostrophe_reg, '', v.get('dstintf'))
+                
+
+                print (srcintf, dstintf)
+
+
                  
         
 if __name__ == "__main__":
