@@ -31,6 +31,17 @@ class fortinet_config_parser:
         content_reg = r'(?P<policy_id>.edit\s\d.*)(?P<set>(.*\n)*?.*next)'
 
         data = {}
+        replacements = {
+            'ALL_TCP': 'TCP/1-65535',
+            'ALL_UDP': 'UDP/1-65536',
+            'ALL_ICMP': 'ICMP_ANY',
+            'TCP-': 'TCP/',
+            'tcp': 'TCP/',
+            'UDP-': 'UDP/',
+            'udp': 'UDP/',
+            'TCP': 'TCP/',
+            'UPD': 'UDP'
+        }
         with open(path, 'r', encoding='utf-8') as f:
             for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, f.read()).group('fw')):
                 policy_id = re.sub(r'edit\s', '', line.group('policy_id').strip())
@@ -43,16 +54,15 @@ class fortinet_config_parser:
 
         for k, v in data.items():
             if 'status' not in v or v.get('status') != 'disable':
-                print(v)
+                #print(v.get('service'))
                 srcintf = re.sub(r'\"', '', v.get('srcintf'))
                 dstintf = re.sub(r'\"', '', v.get('dstintf'))
                 srcaddr = ','.join(sip for sip in re.split(r'\s', re.sub(r'\"', '', v.get('srcaddr'))))
                 dstaddr = ','.join(dip for dip in re.split(r'\s', re.sub(r'\"', '', v.get('dstaddr'))))
-                service = ','.join(svc for svc in re.split(r'\s', re.sub(r'\"', '', v.get('service'))))
-                print (k, srcintf, dstintf, srcaddr, dstaddr, service, v.get('comments'))
+                service = re.compile(r'|'.join(map(re.escape, replacements))).sub(lambda m: replacements[m.group()], ','.join(svc for svc in re.split(r'\s', re.sub(r'\"', '', v.get('service')))))
+                comments = re.sub(r'\"', '', v.get('comments')) if 'comments' in v else ''
+                #print(re.sub('({})'.format('|'.join(map(re.escape, replacements.keys()))), lambda m: replacements[m.group()], service))
 
-
-                 
         
 if __name__ == "__main__":
     #user = input("Please give DB User name: ")
@@ -64,6 +74,3 @@ if __name__ == "__main__":
     sol = fortinet_config_parser()
     #sol.parse_addrgrp('FW3.conf')
     sol.parse_firewall_policy('FW3.conf')
-    
-    
-
