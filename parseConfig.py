@@ -5,6 +5,8 @@ import itertools
 import getpass
 import ipaddress
 
+import re._constants
+
 #db = musql.connect(host='localhost', user='', passwd='', db='', charset='')
 #cursor = db.cursor()
 
@@ -18,7 +20,11 @@ class fortinet_config_parser:
         content_reg = r'(?P<address_name>\".*\")(?P<set>(.*\n)*?.*next)'
         data = {}
         for line in re.finditer(content_reg, re.search(fwaddress_block_reg, config).group('addr')):
+<<<<<<< HEAD
             data[re.sub('\"','', line.group('address_name').strip())] = re.sub(r'\n', ',', (re.sub(r'(.*set\s)|.*next', '', line.group('set').strip())).strip())
+=======
+            data[re.compile(r'\"').sub('', line.group('address_name').strip())] = re.compile(r'(.*set\s)|.*next').sub('', line.group('set').strip())
+>>>>>>> 89d5e1100cd4ef4351a16bb6d05d4dfa587e721d
         print(data)
 
 
@@ -82,7 +88,7 @@ class fortinet_config_parser:
                 service = re.compile('|'.join(map(re.escape, replacements))).sub(lambda m: replacements[m.group()], ','.join(svc for svc in re.split(r'\s', re.sub(r'\"', '', v.get('service')))))
                 #re.sub('({})'.format('|'.join(map(re.escape, replacements.keys()))), lambda m: replacements[m.group()], service)
                 comments = re.sub(r'\"', '', v.get('comments')) if 'comments' in v else ''
-                #print(f'{k}, {srcintf}, {dstintf}, {srcaddr}, {dstaddr}, {service}, {comments}')
+                print(f'{k}, {srcintf}, {dstintf}, {srcaddr}, {dstaddr}, {service}, {comments}')
                 #TODO insert data into DB & pip install mysqldb
 
 def main():
