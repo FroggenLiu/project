@@ -20,7 +20,6 @@ class fortinet_config_parser:
         content_reg = r'(?P<address_name>\".*\")(?P<set>(.*\n)*?.*next)'
         data = {}
         for line in re.finditer(content_reg, re.search(fwaddress_block_reg, config).group('addr')):
-<<<<<<< HEAD
             data[re.sub('\"','', line.group('address_name').strip())] = re.sub(r'\n', ',', (re.sub(r'(.*set\s)|.*next', '', line.group('set').strip())).strip())
 =======
             data[re.compile(r'\"').sub('', line.group('address_name').strip())] = re.compile(r'(.*set\s)|.*next').sub('', line.group('set').strip())
