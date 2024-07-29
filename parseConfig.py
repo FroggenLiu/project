@@ -13,16 +13,43 @@ import ipaddress
 #    db.commit()
 class fortinet_config_parser:
 
-    def parse_system_interface(self, content: str) -> None:
-        system_interface_block_reg = r'(?P<sysintf>.*system\sinterface(.*\n)*?.*^end)' 
+    def parse_system_interface(self, content: str) -> dict:
+        '''
+            1.using regex method 'lookbehinds' to parse system interface
+        '''
+        system_interface_block_reg = r'(?P<sysintf>.*system\sinterface(.*\n)*?.*(?<=next\n)end)' 
         content_reg = r'(?P<intf>\".*\")(?P<set>(.*\n)*?.*next)'
         data = {}
-        print(re.search(system_interface_block_reg, content).group('sysintf'))
         for line in re.finditer(content_reg, re.search(system_interface_block_reg, content).group('sysintf')):
             intf = re.sub(r'\"', '', line.group('intf').strip())
-            for i in re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip())):
-                data[intf] = i
+            data[intf] = {}
+            for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
+                attr, val = re.split(r'\s', i)[0], re.split(r'\s', i.replace('"', ''))[1:]
+                data[intf][attr] = val
         #print(data)
+        return data
+
+    def parse_system_zone(self, content: str) -> None:
+        '''
+            1.parse `zone` in config and mapping zone interface
+        '''
+        system_zone_block_reg = r'(?P<syszone>.*system\szone(.*\n)*?.*(?<=next\n)end)'
+        content_reg = r'(?P<zone>\".*\")(?P<set>(.*\n)*?.*next)'
+        #data, 
+        interfcae_dict = self.parse_system_interface(content)
+        #print(interfcae_dict)
+        for line in re.finditer(content_reg, re.search(system_zone_block_reg, content).group('syszone')):
+            #zone = re.sub(r'\"', '', line.group('zone').strip())
+            #data[zone] = {}
+            for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
+                attr, val = re.split(r'\s', i)[0], re.split(r'\s', i.replace('"', ''))[1:]
+                if attr == 'interface':
+                    for interface in val:
+                        if interface in interfcae_dict and all(k in interfcae_dict[interface] for k in ('interface', 'ip')):#{'interface', 'ip'} <= (interfcae_dict[interface]).keys():
+                            print(interface, interfcae_dict[interface]['vdom'][0], interfcae_dict[interface]['interface'],  interfcae_dict[interface]['ip'])
+                            #data[zone][attr] = val
+                            #TODO insert data into `vlan` table
+        
 
     def parse_firewall_address(self, content: str) -> dict:
         fwaddress_block_reg = r'(?P<addr>.*firewall\saddress(.*\n)*?.*end\n)'
@@ -30,10 +57,11 @@ class fortinet_config_parser:
         data = {}
         for line in re.finditer(content_reg, re.search(fwaddress_block_reg, content).group('addr')):
             address_obj_name = re.sub(r'\"', '', line.group('address_name').strip())
-            #data[address_obj_name] = {}
+            data[address_obj_name] = {}
             for i in re.split(r',', re.sub(r'\n', ',', (re.sub(r'.*(set\s|next)', '', line.group('set').strip())).strip())):
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
                 data[address_obj_name][attr] = val
+        #print(data)
         return data
 
 
@@ -78,7 +106,7 @@ class fortinet_config_parser:
         #with open(path, 'r', encoding='utf-8') as f:        
         for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, content).group('fw')):
             policy_id = line.group('policy_id').strip()
-            #data[policy_id] = {}
+            data[policy_id] = {}
             
             for i in re.split(r'\,', re.sub(r'\n', ',', re.sub(r'.*(set\s|next)', '', line.group('set').strip()))):
                 attr, val = re.split(r'\s', i)[0], re.sub(r'^(\w+\s|\w+\-\w+\s)', '', i)
@@ -109,8 +137,10 @@ def main():
     sol = fortinet_config_parser()
     with open('FW1.conf', 'r', encoding='utf-8') as f:
         content = f.read()
+
+    sol.parse_system_zone(content)
     #sol.parse_firewall_address(content)
-    sol.parse_system_interface(content)
+    #sol.parse_system_interface(content)
     #sol.parse_addrgrp(content)
     #sol.parse_firewall_policy(content)
 
