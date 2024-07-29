@@ -14,15 +14,17 @@ import ipaddress
 class fortinet_config_parser:
 
     def parse_system_interface(self, content: str) -> None:
-        system_interface_block_reg = r'(?P<sysintf>.*system\sinterface(.*\n)*?.*^end)' 
+        #Lookaheads and Lookbehinds
+        system_interface_block_reg = r'(?P<sysintf>.*system\sinterface(.*\n)*?.*(?<=next\n)end)' 
         content_reg = r'(?P<intf>\".*\")(?P<set>(.*\n)*?.*next)'
         data = {}
-        print(re.search(system_interface_block_reg, content).group('sysintf'))
         for line in re.finditer(content_reg, re.search(system_interface_block_reg, content).group('sysintf')):
             intf = re.sub(r'\"', '', line.group('intf').strip())
-            for i in re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip())):
-                data[intf] = i
-        #print(data)
+            data[intf] = {}
+            for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
+                attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
+                data[intf][attr] = val
+        print(data)
 
     def parse_firewall_address(self, content: str) -> dict:
         fwaddress_block_reg = r'(?P<addr>.*firewall\saddress(.*\n)*?.*end\n)'
@@ -30,10 +32,11 @@ class fortinet_config_parser:
         data = {}
         for line in re.finditer(content_reg, re.search(fwaddress_block_reg, content).group('addr')):
             address_obj_name = re.sub(r'\"', '', line.group('address_name').strip())
-            #data[address_obj_name] = {}
+            data[address_obj_name] = {}
             for i in re.split(r',', re.sub(r'\n', ',', (re.sub(r'.*(set\s|next)', '', line.group('set').strip())).strip())):
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
                 data[address_obj_name][attr] = val
+        #print(data)
         return data
 
 
@@ -78,7 +81,7 @@ class fortinet_config_parser:
         #with open(path, 'r', encoding='utf-8') as f:        
         for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, content).group('fw')):
             policy_id = line.group('policy_id').strip()
-            #data[policy_id] = {}
+            data[policy_id] = {}
             
             for i in re.split(r'\,', re.sub(r'\n', ',', re.sub(r'.*(set\s|next)', '', line.group('set').strip()))):
                 attr, val = re.split(r'\s', i)[0], re.sub(r'^(\w+\s|\w+\-\w+\s)', '', i)
