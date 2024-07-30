@@ -3,7 +3,7 @@ import io
 import itertools
 #import MySQLdb as musql
 import getpass
-import ipaddress
+from ipaddress import IPv4Network
 
 #db = musql.connect(host='localhost', user='', passwd='', db='', charset='')
 #cursor = db.cursor()
@@ -15,7 +15,7 @@ class fortinet_config_parser:
 
     def parse_system_interface(self, content: str) -> dict:
         '''
-            1.using regex method 'lookbehinds' to parse system interface
+            1.due to nest 'config..end' in config. using regex 'lookbehinds' to resolved the problem.
         '''
         system_interface_block_reg = r'(?P<sysintf>.*system\sinterface(.*\n)*?.*(?<=next\n)end)' 
         content_reg = r'(?P<intf>\".*\")(?P<set>(.*\n)*?.*next)'
@@ -35,20 +35,19 @@ class fortinet_config_parser:
         '''
         system_zone_block_reg = r'(?P<syszone>.*system\szone(.*\n)*?.*(?<=next\n)end)'
         content_reg = r'(?P<zone>\".*\")(?P<set>(.*\n)*?.*next)'
-        #data, 
         interfcae_dict = self.parse_system_interface(content)
-        #print(interfcae_dict)
+
         for line in re.finditer(content_reg, re.search(system_zone_block_reg, content).group('syszone')):
-            #zone = re.sub(r'\"', '', line.group('zone').strip())
-            #data[zone] = {}
             for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i.replace('"', ''))[1:]
                 if attr == 'interface':
                     for interface in val:
-                        if interface in interfcae_dict and all(k in interfcae_dict[interface] for k in ('interface', 'ip')):#{'interface', 'ip'} <= (interfcae_dict[interface]).keys():
-                            print(interface, interfcae_dict[interface]['vdom'][0], interfcae_dict[interface]['interface'],  interfcae_dict[interface]['ip'])
-                            #data[zone][attr] = val
+                        #{'interface', 'ip'} <= (interfcae_dict[interface]).keys():
+                        if interface in interfcae_dict and all(k in interfcae_dict[interface] for k in ('vdom', 'ip')):
+                            #print(interface, interfcae_dict[interface]['vdom'][0], interfcae_dict[interface]['interface'],  interfcae_dict[interface]['ip'])
                             #TODO insert data into `vlan` table
+                            address, netmask = re.split(r'\/' ,str(IPv4Network('/'.join(ip_mask for ip_mask in interfcae_dict[interface]['ip']), False)))
+                            print(interface, interfcae_dict[interface]['vdom'][0], address, netmask)
         
 
     def parse_firewall_address(self, content: str) -> dict:
@@ -125,7 +124,7 @@ class fortinet_config_parser:
                 #re.sub('({})'.format('|'.join(map(re.escape, replacements.keys()))), lambda m: replacements[m.group()], service)
                 comments = re.sub(r'\"', '', v.get('comments')) if 'comments' in v else ''
                 print(f'{k}, {srcintf}, {dstintf}, {srcaddr}, {dstaddr}, {service}, {comments}')
-                #TODO insert data into DB & pip install mysqldb
+                #TODO insert data into DB 
 
 def main():
     #user = input("Please give DB User name: ")
