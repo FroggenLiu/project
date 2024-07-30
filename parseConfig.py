@@ -13,15 +13,10 @@ import ipaddress
 #    db.commit()
 class fortinet_config_parser:
 
-<<<<<<< HEAD
     def parse_system_interface(self, content: str) -> dict:
         '''
             1.using regex method 'lookbehinds' to parse system interface
         '''
-=======
-    def parse_system_interface(self, content: str) -> None:
-        #Lookaheads and Lookbehinds
->>>>>>> ba0836d0fdfc34d2ba37b5a6cb63736e5e93a11c
         system_interface_block_reg = r'(?P<sysintf>.*system\sinterface(.*\n)*?.*(?<=next\n)end)' 
         content_reg = r'(?P<intf>\".*\")(?P<set>(.*\n)*?.*next)'
         data = {}
@@ -29,7 +24,6 @@ class fortinet_config_parser:
             intf = re.sub(r'\"', '', line.group('intf').strip())
             data[intf] = {}
             for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
-<<<<<<< HEAD
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i.replace('"', ''))[1:]
                 data[intf][attr] = val
         #print(data)
@@ -56,11 +50,6 @@ class fortinet_config_parser:
                             #data[zone][attr] = val
                             #TODO insert data into `vlan` table
         
-=======
-                attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
-                data[intf][attr] = val
-        print(data)
->>>>>>> ba0836d0fdfc34d2ba37b5a6cb63736e5e93a11c
 
     def parse_firewall_address(self, content: str) -> dict:
         fwaddress_block_reg = r'(?P<addr>.*firewall\saddress(.*\n)*?.*end\n)'
