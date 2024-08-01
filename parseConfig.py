@@ -5,7 +5,7 @@ import mysql.connector
 from mysql.connector import errorcode
 import getpass
 from ipaddress import IPv4Network
-import getpass
+
 
 #db = musql.connect(host='localhost', user='', passwd='', db='', charset='')
 #cursor = db.cursor()
@@ -17,7 +17,7 @@ class fortinet_config_parser:
 
     def parse_system_interface(self, content: str) -> dict:
         '''
-            1.due to nest 'config..end' in config. using regex 'lookbehinds' to resolved the problem.
+            1.due to nest 'config..end' in config. using regex 'lookbehinds' to refortived the problem.
         '''
         system_interface_block_reg = r'(?P<sysintf>.*system\sinterface(.*\n)*?.*(?<=next\n)end)' 
         content_reg = r'(?P<intf>\".*\")(?P<set>(.*\n)*?.*next)'
@@ -140,13 +140,14 @@ def main():
         'user': 'user',
         'password': 'password',
         'host': 'localhost',
-        'database': 'employees',
+        'database': 'database',
         'raise_on_warnings': True,
         'charset': 'utf8'
     }
     
     try:
         cnx = mysql.connector.connect(**config)
+        cursor = cnx.cursor()
     except mysql.connector.Error as err:
         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -155,22 +156,16 @@ def main():
         else:
             print(err)
     else:
+        forti = fortinet_config_parser()
+        with cnx.cursor() as cursor:
+            with open('FW1.conf', 'r', encoding='utf-8') as f:
+                content = f.read()
+            #forti.parse_system_zone(content)
+            #forti.parse_firewall_address(content)
+            #forti.parse_system_interface(content)
+            #forti.parse_addrgrp(content)
+            #forti.parse_firewall_policy(content)
         cnx.close()
-
-    sol = fortinet_config_parser()
-    with cnx.cursor() as cursor:
-        #cursor.execute(query)
-        #for row in cursor.feachall():
-            #print(row)
-        with open('FW1.conf', 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        #sol.parse_system_zone(content)
-        #sol.parse_firewall_address(content)
-        #sol.parse_system_interface(content)
-        #sol.parse_addrgrp(content)
-        #sol.parse_firewall_policy(content)
-    cnx.close()
 
 if __name__ == "__main__":
     main()
