@@ -1,9 +1,11 @@
 import re
 import io
 import itertools
-#import MySQLdb as musql
+import mysql.connector
+from mysql.connector import errorcode
 import getpass
 from ipaddress import IPv4Network
+import getpass
 
 #db = musql.connect(host='localhost', user='', passwd='', db='', charset='')
 #cursor = db.cursor()
@@ -48,6 +50,7 @@ class fortinet_config_parser:
                             #TODO insert data into `vlan` table
                             address, netmask = re.split(r'\/' ,str(IPv4Network('/'.join(ip_mask for ip_mask in interfcae_dict[interface]['ip']), False)))
                             print(interface, interfcae_dict[interface]['vdom'][0], address, netmask)
+                            #insert_data = (fwid, interface, address, netmask, order)
         
 
     def parse_firewall_address(self, content: str) -> dict:
@@ -133,16 +136,41 @@ def main():
     #except Exception as error:
     #    print('ERROR', error)
     #db = musql.connect(host='localhost', user='', passwd=pwd, db='pcloudfw', charset='utf8')
+    config = {
+        'user': 'user',
+        'password': 'password',
+        'host': 'localhost',
+        'database': 'employees',
+        'raise_on_warnings': True,
+        'charset': 'utf8'
+    }
+    
+    try:
+        cnx = mysql.connector.connect(**config)
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            print("Something is wrong with your user name or password")
+        elif err.errno == errorcode.ER_BAD_DB_ERROR: 
+            print("Database does not exist")
+        else:
+            print(err)
+    else:
+        cnx.close()
+
     sol = fortinet_config_parser()
-    with open('FW1.conf', 'r', encoding='utf-8') as f:
-        content = f.read()
+    with cnx.cursor() as cursor:
+        #cursor.execute(query)
+        #for row in cursor.feachall():
+            #print(row)
+        with open('FW1.conf', 'r', encoding='utf-8') as f:
+            content = f.read()
 
-    sol.parse_system_zone(content)
-    #sol.parse_firewall_address(content)
-    #sol.parse_system_interface(content)
-    #sol.parse_addrgrp(content)
-    #sol.parse_firewall_policy(content)
-
+        #sol.parse_system_zone(content)
+        #sol.parse_firewall_address(content)
+        #sol.parse_system_interface(content)
+        #sol.parse_addrgrp(content)
+        #sol.parse_firewall_policy(content)
+    cnx.close()
 
 if __name__ == "__main__":
     main()
