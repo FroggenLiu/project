@@ -1,10 +1,12 @@
 import re
 import io
+import os
 import itertools
+import getpass
 import mysql.connector
 from mysql.connector import errorcode
-import getpass
 from ipaddress import IPv4Network
+from dotenv import load_dotenv
 
 
 #db = musql.connect(host='localhost', user='', passwd='', db='', charset='')
@@ -136,11 +138,13 @@ def main():
     #except Exception as error:
     #    print('ERROR', error)
     #db = musql.connect(host='localhost', user='', passwd=pwd, db='pcloudfw', charset='utf8')
+
+    load_dotenv()
     config = {
-        'user': 'user',
-        'password': 'password',
-        'host': 'localhost',
-        'database': 'database',
+        'user': os.getenv('USER'),
+        'password': os.getenv('PASSWORD'),
+        'host': os.getenv('HOST'),
+        'database': os.getenv('DATABASE'),
         'raise_on_warnings': True,
         'charset': 'utf8'
     }
@@ -158,6 +162,9 @@ def main():
     else:
         forti = fortinet_config_parser()
         with cnx.cursor() as cursor:
+            cursor.execute("SELECT * FROM user")
+            for row in cursor.fetchall():
+                print(row)
             with open('FW1.conf', 'r', encoding='utf-8') as f:
                 content = f.read()
             #forti.parse_system_zone(content)
