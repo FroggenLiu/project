@@ -9,13 +9,11 @@ from dotenv import load_dotenv
 from datetime import datetime
 import pytz
 
-tz_tw = pytz.timezone('Asia/Taipei') 
-current_time = datetime.now(tz_tw).strftime("%Y-%m-%d %H:%M:%S")
+current_time = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y-%m-%d %H:%M:%S")
 add_vlan = ("INSERT INTO vlan (fwid, vname, network, cidr, vorder) VALUES (%s, %s, %s, %s, %s)")
 add_policy = ("INSERT INTO {} (fwid, vlanfrom, vlanto, userid, adminid, src, dst, service, comment, addtime, nat) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
 
 class Database:
-
     def __init__(self):
         load_dotenv()
         self.config = {
@@ -41,7 +39,6 @@ class Database:
 
 
 class fortinet_config_parser:
-
     def parse_config(self, content: str, block_name: str) -> dict:
         block_reg = ''
         content_reg = ''
@@ -66,6 +63,22 @@ class fortinet_config_parser:
                 data[keys][attr] = val
         return data
 
+    def parse_firewall_policy(self, content: str) -> dict:
+        fwpolicy_block_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
+        content_reg = r'(?P<policy_id>\d+)(?P<set>(.*\n)*?.*next)'
+
+        data = {}       
+        for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, content).group('fw')):
+            policy_id = line.group('policy_id').strip()
+            data[policy_id] = {}
+            
+            for i in re.split(r'\,', re.sub(r'\n', ',', re.sub(r'.*(set\s|next)', '', line.group('set').strip()))):
+                attr, val = re.split(r'\s', i)[0], re.sub(r'^(\w+\s|\w+\-\w+\s)', '', i)
+                if attr:
+                    data[policy_id][attr] = val
+        #print(data)
+        return(data)
+
     def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str) -> None:
         interfcae_dict = self.parse_config(content, 'sysintf')
         zone_dict = self.parse_config(content, 'syszone')
@@ -82,26 +95,10 @@ class fortinet_config_parser:
                         vdom =  interfcae_dict[intf]['vdom'][0]
                         data_vlan = (fw_name, zone, address, int(netmask), order)
                         db.execute(add_vlan, data_vlan)
-        print(f'Data insert into table \"vlan\" has been finished.')        
-                                  
-    def parse_firewall_address(self, content: str) -> dict:
-        fwaddress_block_reg = r'(?P<addr>.*firewall\saddress(.*\n)*?.*end\n)'
-        content_reg = r'(?P<address_name>\".*\")(?P<set>(.*\n)*?.*next)'
-        data = {}
-        for line in re.finditer(content_reg, re.search(fwaddress_block_reg, content).group('addr')):
-            address_obj_name = re.sub(r'\"', '', line.group('address_name').strip())
-            data[address_obj_name] = {}
-            for i in re.split(r',', re.sub(r'\n', ',', (re.sub(r'.*(set\s|next)', '', line.group('set').strip())).strip())):
-                attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
-                data[address_obj_name][attr] = val
-        print(data)
-        return data
+        print(f'Data insert into table \"vlan\" has been finished.')   
 
-    def parse_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str) -> None:
-        fwpolicy_block_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
-        content_reg = r'(?P<policy_id>\d+)(?P<set>(.*\n)*?.*next)'
-
-        data = {}
+    def insert_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str) -> None:
+        policy_dict = self.parse_firewall_policy(content)
         replacements = {
             'ALL_TCP': 'TCP/1-65535',
             'ALL_UDP': 'UDP/1-65535',
@@ -114,17 +111,7 @@ class fortinet_config_parser:
             'UPD': 'UDP',
         }
 
-        #with open(path, 'r', encoding='utf-8') as f:        
-        for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, content).group('fw')):
-            policy_id = line.group('policy_id').strip()
-            data[policy_id] = {}
-            
-            for i in re.split(r'\,', re.sub(r'\n', ',', re.sub(r'.*(set\s|next)', '', line.group('set').strip()))):
-                attr, val = re.split(r'\s', i)[0], re.sub(r'^(\w+\s|\w+\-\w+\s)', '', i)
-                if attr:
-                    data[policy_id][attr] = val
-        #print(data)
-        for k, v in data.items():
+        for k, v in policy_dict.items():
             if 'status' not in v or v.get('status') != 'disable':
                 srcintf, dstintf = re.sub(r'\"', '', v.get('srcintf')), re.sub(r'\"', '', v.get('dstintf'))
                 srcaddr = ','.join(sip for sip in re.split(r'\s', re.sub(r'\"', '', v.get('srcaddr'))))
@@ -138,6 +125,19 @@ class fortinet_config_parser:
                 data_policy = (int(k), srcintf, dstintf, '', '', srcaddr, dstaddr, service, comments, current_time, None)
                 db.execute(add_policy.format(fw_name), data_policy)
         print(f'Data insert into table \"{fw_name}\" has been finished.')
+                                
+    def parse_firewall_address(self, content: str) -> dict:
+        fwaddress_block_reg = r'(?P<addr>.*firewall\saddress(.*\n)*?.*end\n)'
+        content_reg = r'(?P<address_name>\".*\")(?P<set>(.*\n)*?.*next)'
+        data = {}
+        for line in re.finditer(content_reg, re.search(fwaddress_block_reg, content).group('addr')):
+            address_obj_name = re.sub(r'\"', '', line.group('address_name').strip())
+            data[address_obj_name] = {}
+            for i in re.split(r',', re.sub(r'\n', ',', (re.sub(r'.*(set\s|next)', '', line.group('set').strip())).strip())):
+                attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
+                data[address_obj_name][attr] = val
+        #print(data)
+        return data
 
     def parse_addrgrp(self, db: mysql.connector.cursor, content: str) -> None:
         addrgrp_reg = r'(?P<addrgrp>.*addrgrp(.*\n)*?.*end)'
@@ -159,7 +159,6 @@ class fortinet_config_parser:
                 #if re.match(r'^\d', i):
                     #ip, mask = re.split(r'\/', i)
                 
-
 def main():
     config_path = input("Where is your config? ")
     fw_name = input("What's your FW name? ")
@@ -168,6 +167,7 @@ def main():
             content = f.read()
         forti = fortinet_config_parser()
         forti.insert_vlan(db, content, fw_name)
+        forti.insert_firewall_policy(db, content, fw_name)
 
         #forti.parse_addrgrp(db, content)
 
