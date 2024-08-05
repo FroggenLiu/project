@@ -13,7 +13,7 @@ current_time = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y-%m-%d %H:
 add_vlan = ("INSERT INTO vlan (fwid, vname, network, cidr, vorder) VALUES (%s, %s, %s, %s, %s)")
 add_policy = ("INSERT INTO {} (fwid, vlanfrom, vlanto, userid, adminid, src, dst, service, comment, addtime, nat) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
 
-class Database:
+class database:
     def __init__(self):
         load_dotenv()
         self.config = {
@@ -38,7 +38,7 @@ class Database:
         print("DB Connection has been closed.")         
 
 
-class fortinet_config_parser:
+class fortinet:
     def parse_config(self, content: str, block_name: str) -> dict:
         block_reg = ''
         content_reg = ''
@@ -160,10 +160,10 @@ class fortinet_config_parser:
 def main():
     config_path = input("Where is your config? ")
     fw_name = input("What's your FW name? ")
-    with Database() as db:
+    with database() as db:
         with open(config_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        forti = fortinet_config_parser()
+        forti = fortinet()
         forti.insert_vlan(db, content, fw_name)
         forti.insert_firewall_policy(db, content, fw_name)
 
