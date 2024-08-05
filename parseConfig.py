@@ -3,11 +3,11 @@ import io
 import os
 import itertools
 import mysql.connector
-from mysql.connector import errorcode
 from ipaddress import IPv4Network
 from dotenv import load_dotenv
 from datetime import datetime
 import pytz
+from collections import defaultdict
 
 current_time = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y-%m-%d %H:%M:%S")
 add_vlan = ("INSERT INTO vlan (fwid, vname, network, cidr, vorder) VALUES (%s, %s, %s, %s, %s)")
@@ -43,7 +43,7 @@ class fortinet_config_parser:
         block_reg = ''
         content_reg = ''
         group = ''
-        data = {}
+        data = defaultdict(dict)
 
         match block_name:
             case 'sysintf':
@@ -57,7 +57,6 @@ class fortinet_config_parser:
 
         for line in re.finditer(content_reg, re.search(block_reg, content).group(block_name)):
             keys = re.sub(r'\"', '', line.group(group).strip())
-            data[keys] = {}
             for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i.replace('"', ''))[1:]
                 data[keys][attr] = val
@@ -66,11 +65,10 @@ class fortinet_config_parser:
     def parse_firewall_policy(self, content: str) -> dict:
         fwpolicy_block_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
         content_reg = r'(?P<policy_id>\d+)(?P<set>(.*\n)*?.*next)'
+        data = defaultdict(dict)
 
-        data = {}       
         for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, content).group('fw')):
             policy_id = line.group('policy_id').strip()
-            data[policy_id] = {}
             
             for i in re.split(r'\,', re.sub(r'\n', ',', re.sub(r'.*(set\s|next)', '', line.group('set').strip()))):
                 attr, val = re.split(r'\s', i)[0], re.sub(r'^(\w+\s|\w+\-\w+\s)', '', i)
@@ -129,10 +127,10 @@ class fortinet_config_parser:
     def parse_firewall_address(self, content: str) -> dict:
         fwaddress_block_reg = r'(?P<addr>.*firewall\saddress(.*\n)*?.*end\n)'
         content_reg = r'(?P<address_name>\".*\")(?P<set>(.*\n)*?.*next)'
-        data = {}
+        data = defaultdict(dict)
+
         for line in re.finditer(content_reg, re.search(fwaddress_block_reg, content).group('addr')):
             address_obj_name = re.sub(r'\"', '', line.group('address_name').strip())
-            data[address_obj_name] = {}
             for i in re.split(r',', re.sub(r'\n', ',', (re.sub(r'.*(set\s|next)', '', line.group('set').strip())).strip())):
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
                 data[address_obj_name][attr] = val
@@ -142,7 +140,7 @@ class fortinet_config_parser:
     def parse_addrgrp(self, db: mysql.connector.cursor, content: str) -> None:
         addrgrp_reg = r'(?P<addrgrp>.*addrgrp(.*\n)*?.*end)'
         content_reg = r'(?P<grp_name>.\"\w+.*\")(?P<set>(.*\n)*?.*next)'
-        data = {}
+        data = defaultdict(dict)
 
         for line in re.finditer(content_reg, re.search(addrgrp_reg, content).group('addrgrp')):
             data[re.compile(r'\"').sub('', line.group('grp_name').strip())] = re.sub(r'set\smember\s', '', line.group(3).strip())
