@@ -10,7 +10,7 @@ import pytz
 from collections import defaultdict
 
 current_time = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y-%m-%d %H:%M:%S")
-add_vlan = ("INSERT INTO vlan (fwid, vname, network, cidr, vorder) VALUES (%s, %s, %s, %s, %s)")
+add_vlan = ("INSERT INTO vlan (fwid, vdom, vname, network, cidr, vorder) VALUES (%s, %s, %s, %s, %s, %s)")
 add_policy = ("INSERT INTO {} (fwid, vlanfrom, vlanto, userid, adminid, src, dst, service, comment, addtime, nat) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
 
 class database:
@@ -39,7 +39,7 @@ class database:
 
 
 class fortinet:
-    def parse_config(self, content: str, block_name: str) -> dict:
+    def parse_config(self, content: str, block_name: str, vdom_name: str) -> dict:
         block_reg = ''
         content_reg = ''
         group = ''
@@ -53,19 +53,25 @@ class fortinet:
             case 'syszone':
                 block_reg = r'(?P<syszone>.*system\szone(.*\n)*?.*(?<=next\n)end)'
                 content_reg = r'(?P<zone>\".*\")(?P<set>(.*\n)*?.*next)'
+                content = re.search(r'(?P<vdom>(config\svdom\sedit\s{})(.*\n)*?end\nend)'.format(vdom_name), content).group('vdom') if len(re.findall(r'.*system\szone', content)) >= 1 else content
                 group = 'zone'
 
-        for line in re.finditer(content_reg, re.search(block_reg, content).group(block_name)):
-            keys = re.sub(r'\"', '', line.group(group).strip())
-            for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
-                attr, val = re.split(r'\s', i)[0], re.split(r'\s', i.replace('"', ''))[1:]
-                data[keys][attr] = val
-        return data
+        if re.search(block_reg, content) is not None :
+            for line in re.finditer(content_reg, re.search(block_reg, content).group(block_name)):
+                keys = re.sub(r'\"', '', line.group(group).strip())
+                for i in re.split(r',', re.sub(r'\n', ',', re.sub(r'.*(set\s|next|end|config\s.*)', '', line.group('set').strip()).strip())):
+                    attr, val = re.split(r'\s', i)[0], re.split(r'\s', i.replace('"', ''))[1:]
+                    data[keys][attr] = val
+            return data
+        else:
+            print(f'No ZONE config in vdom \"{vdom_name}\"')
 
-    def parse_firewall_policy(self, content: str) -> dict:
+    def parse_firewall_policy(self, content: str, vdom_name: str) -> dict:
         fwpolicy_block_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
         content_reg = r'(?P<policy_id>\d+)(?P<set>(.*\n)*?.*next)'
         data = defaultdict(dict)
+
+        content = re.search(r'(?P<vdom>(config\svdom\sedit\s{})(.*\n)*?end\nend)'.format(vdom_name), content).group('vdom') if len(re.findall(r'.*firewall\spolicy', content)) > 1 else content
 
         for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, content).group('fw')):
             policy_id = line.group('policy_id').strip()
@@ -74,7 +80,6 @@ class fortinet:
                 attr, val = re.split(r'\s', i)[0], re.sub(r'^(\w+\s|\w+\-\w+\s)', '', i)
                 if attr:
                     data[policy_id][attr] = val
-        #print(data)
         return(data)
 
     def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str) -> None:
@@ -91,12 +96,12 @@ class fortinet:
                         order += 1
                         address, netmask = re.split(r'\/', str(IPv4Network('/'.join(ip_mask for ip_mask in interfcae_dict[intf]['ip']), False)))
                         vdom =  interfcae_dict[intf]['vdom'][0]
-                        data_vlan = (fw_name, zone, address, int(netmask), order)
+                        data_vlan = (fw_name, vdom, zone, address, int(netmask), order)
                         db.execute(add_vlan, data_vlan)
         print(f'Data insert into table \"vlan\" has been finished.')   
 
-    def insert_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str) -> None:
-        policy_dict = self.parse_firewall_policy(content)
+    def insert_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str) -> None:
+        policy_dict = self.parse_firewall_policy(content, vdom_name)
         replacements = {
             'ALL_TCP': 'TCP/1-65535',
             'ALL_UDP': 'UDP/1-65535',
@@ -134,8 +139,8 @@ class fortinet:
             for i in re.split(r',', re.sub(r'\n', ',', (re.sub(r'.*(set\s|next)', '', line.group('set').strip())).strip())):
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
                 data[address_obj_name][attr] = val
-        #print(data)
-        return data
+        print(data)
+        #return data
 
     def parse_addrgrp(self, db: mysql.connector.cursor, content: str) -> None:
         addrgrp_reg = r'(?P<addrgrp>.*addrgrp(.*\n)*?.*end)'
@@ -160,17 +165,18 @@ class fortinet:
 def main():
     config_path = input("Where is your config? ")
     fw_name = input("What's your FW name? ")
+    vdom_name = input("What's your vdom name? ")
     with database() as db:
         with open(config_path, 'r', encoding='utf-8') as f:
             content = f.read()
+
+    
         forti = fortinet()
-        forti.insert_vlan(db, content, fw_name)
-        forti.insert_firewall_policy(db, content, fw_name)
+        forti.insert_vlan(db, content, fw_name, vdom_name)
+        forti.insert_firewall_policy(db, content, fw_name, vdom_name)
 
-        #forti.parse_addrgrp(db, content)
-
-        #forti.parse_firewall_address(content)
-        #forti.parse_addrgrp(content)
+        #forti.parse_firewall_policy(content)
+        #forti.parse_config(content, 'syszone', 'ECC_DMZ')
 
 if __name__ == "__main__":
     main()
