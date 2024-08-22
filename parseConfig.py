@@ -75,16 +75,15 @@ class fortinet:
 
         for line in re.finditer(content_reg, re.search(fwpolicy_block_reg, content).group('fw')):
             policy_id = line.group('policy_id').strip()
-            
             for i in re.split(r'\,', re.sub(r'\n', ',', re.sub(r'.*(set\s|next)', '', line.group('set').strip()))):
                 attr, val = re.split(r'\s', i)[0], re.sub(r'^(\w+\s|\w+\-\w+\s)', '', i)
                 if attr:
                     data[policy_id][attr] = val
         return(data)
 
-    def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str) -> None:
-        interfcae_dict = self.parse_config(content, 'sysintf')
-        zone_dict = self.parse_config(content, 'syszone')
+    def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str) -> None:
+        interfcae_dict = self.parse_config(content, 'sysintf', vdom_name)
+        zone_dict = self.parse_config(content, 'syszone', vdom_name)
         order = 0
 
         for zone, zone_attr in zone_dict.items():
@@ -98,6 +97,9 @@ class fortinet:
                         vdom =  interfcae_dict[intf]['vdom'][0]
                         data_vlan = (fw_name, vdom, zone, address, int(netmask), order)
                         db.execute(add_vlan, data_vlan)
+        order += 1
+        default = (fw_name, vdom_name, '', '0.0.0.0', '0', order)
+        db.execute(add_vlan, default)
         print(f'Data insert into table \"vlan\" has been finished.')   
 
     def insert_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str) -> None:
@@ -169,8 +171,6 @@ def main():
     with database() as db:
         with open(config_path, 'r', encoding='utf-8') as f:
             content = f.read()
-
-    
         forti = fortinet()
         forti.insert_vlan(db, content, fw_name, vdom_name)
         forti.insert_firewall_policy(db, content, fw_name, vdom_name)
