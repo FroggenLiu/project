@@ -151,8 +151,8 @@ def main():
             with open(config_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             forti = fortinet()
-        forti.insert_vlan(db, content, fw_name, vdom_name)
-        forti.insert_firewall_policy(db, content, fw_name, vdom_name)
+            forti.insert_vlan(db, content, fw_name, vdom_name)
+            forti.insert_firewall_policy(db, content, fw_name, vdom_name)
 
         #forti.parse_firewall_policy(content)
         #forti.parse_config(content, 'syszone', 'ECC_DMZ')
