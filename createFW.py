@@ -10,8 +10,8 @@ create_table = ("CREATE TABLE {} SELECT * FROM FW3 WHERE 1 = 0")
 
 def add_fw_info(db: "db object"):
     for k, v in json.loads(os.getenv("FW")).items():
-        hashed = bcrypt.hashpw(v['password'].encode(), bcrypt.gensalt())
-        data = (k, v['vdom'], v['name'], v['ip'], v['account'], hashed, '0', None)
+        hashed = bcrypt.hashpw(v.get('password').encode(), bcrypt.gensalt())
+        data = (k, v.get('vdom'), v.get('name'), v.get('ip'), v.get('account'), hashed, '0', None)
         try:
             db.execute(add_fw, data)
             print(f'FW \"{k}\" info has been added.')

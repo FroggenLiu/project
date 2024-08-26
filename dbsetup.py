@@ -6,7 +6,7 @@ class database:
     def __init__(self):
         load_dotenv()
         self.config = {
-            'user': os.getenv('USER'),
+            'user': os.getenv('DBUSER'),
             'password': os.getenv('PASSWORD'),
             'host': os.getenv('HOST'),
             'database': os.getenv('DATABASE'),

@@ -8,8 +8,8 @@ add_user = ("INSERT INTO user (uid, permission, name, passwd) VALUES (%s, %s, %s
 
 def add_user(db: "db object"):
     for k,v in json.loads(os.getenv("USERS")).items():
-        hashed = bcrypt.hashpw(v[1].encode(), bcrypt.gensalt())
-        data = (k, '1', v[0], hashed)                   
+        hashed = bcrypt.hashpw(v.get('password').encode(), bcrypt.gensalt())
+        data = (k, '1', v.get('account'), hashed)                   
         try:
             db.execute(add_user, data)
             print(f'User \"{k}\" has been insert into database table \'user\'.')
