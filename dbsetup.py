@@ -24,4 +24,4 @@ class database:
         self.cnx.commit()
         self.cursor.close()
         self.cnx.close()
-        print("DB Connection has been closed.")        
+        print("DB Connection is closed.")        

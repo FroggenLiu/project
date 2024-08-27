@@ -12,7 +12,7 @@ def add_user(db: "db object"):
         data = (k, '1', v.get('account'), hashed)                   
         try:
             db.execute(add_user, data)
-            print(f'User \"{k}\" has been insert into database table \'user\'.')
+            print(f'User \"{k}\" has been created.')
         except mysql.connector.Error as e:
             print(e)
 

@@ -77,7 +77,7 @@ class fortinet:
         order += 1
         default = (fw_name, vdom_name, '', '0.0.0.0', '0', order)
         #db.execute(add_vlan, default)
-        print(f'Data insert into table \"vlan\" has been finished.')   
+        print(f'Data insert into table \"vlan\" is finished.')   
 
     def insert_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str) -> None:
         policy_dict = self.parse_firewall_policy(content, vdom_name)
@@ -106,7 +106,7 @@ class fortinet:
                 #print(f'{k}, {srcintf}, {dstintf}, {srcaddr}, {dstaddr}, {service}, {comments}')
                 data_policy = (int(k), srcintf, dstintf, '', '', srcaddr, dstaddr, service, comments, current_time, None)
                 #db.execute(add_policy.format(fw_name), data_policy)
-        print(f'Data insert into table \"{fw_name}\" has been finished.')
+        print(f'Data insert into table \"{fw_name}\" is finished.')
                                 
     def parse_firewall_address(self, content: str) -> dict:
         fwaddress_block_reg = r'(?P<addr>.*firewall\saddress(.*\n)*?.*end\n)'
@@ -144,15 +144,15 @@ class fortinet:
 def main():
     database = dbsetup.database()
     for k,v in json.loads(os.getenv("FW")).items():
-        fw_name = k
-        config_path = v.get('config')
-        vdom_name = v.get('vdom')
+        fw_name, config_path, vdom_name = k, v.get('config'), v.get('vdom')
         with database as db:
             with open(config_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             forti = fortinet()
+            print(f'Starting parse \"{fw_name}\" config.')
             forti.insert_vlan(db, content, fw_name, vdom_name)
             forti.insert_firewall_policy(db, content, fw_name, vdom_name)
+        print(f'Parsing \"{fw_name}\" config is finished.\n')
 
         #forti.parse_firewall_policy(content)
         #forti.parse_config(content, 'syszone', 'ECC_DMZ')
