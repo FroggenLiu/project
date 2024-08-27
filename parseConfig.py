@@ -12,8 +12,8 @@ from datetime import datetime
 from collections import defaultdict
 
 current_time = datetime.now(pytz.timezone('Asia/Taipei')).strftime("%Y-%m-%d %H:%M:%S")
-add_vlan = ("INSERT INTO vlan (fwid, vdom, vname, network, cidr, vorder) VALUES (%s, %s, %s, %s, %s, %s)")
-add_policy = ("INSERT INTO {} (fwid, vlanfrom, vlanto, userid, adminid, src, dst, service, comment, addtime, nat) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
+add_vlan_statement = ("INSERT INTO vlan (fwid, vdom, vname, network, cidr, vorder) VALUES (%s, %s, %s, %s, %s, %s)")
+add_policy_statement = ("INSERT INTO {} (fwid, vlanfrom, vlanto, userid, adminid, src, dst, service, comment, addtime, nat) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
 
 class fortinet:
     def parse_config(self, content: str, block_name: str, vdom_name: str) -> dict:
@@ -73,10 +73,10 @@ class fortinet:
                         address, netmask = re.split(r'\/', str(IPv4Network('/'.join(ip_mask for ip_mask in interfcae_dict[intf]['ip']), False)))
                         vdom =  interfcae_dict[intf]['vdom'][0]
                         data_vlan = (fw_name, vdom, zone, address, int(netmask), order)
-                        #db.execute(add_vlan, data_vlan)
+                        #db.execute(add_vlan_statement, data_vlan)
         order += 1
         default = (fw_name, vdom_name, '', '0.0.0.0', '0', order)
-        #db.execute(add_vlan, default)
+        #db.execute(add_vlan_statement, default)
         print(f'Data insert into table \"vlan\" is finished.')   
 
     def insert_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str) -> None:
@@ -105,7 +105,7 @@ class fortinet:
                 comments = re.sub(r'\"', '', v.get('comments')) if 'comments' in v else ''
                 #print(f'{k}, {srcintf}, {dstintf}, {srcaddr}, {dstaddr}, {service}, {comments}')
                 data_policy = (int(k), srcintf, dstintf, '', '', srcaddr, dstaddr, service, comments, current_time, None)
-                #db.execute(add_policy.format(fw_name), data_policy)
+                db.execute(add_policy_statement.format(fw_name), data_policy)
         print(f'Data insert into table \"{fw_name}\" is finished.')
                                 
     def parse_firewall_address(self, content: str) -> dict:
@@ -118,8 +118,8 @@ class fortinet:
             for i in re.split(r',', re.sub(r'\n', ',', (re.sub(r'.*(set\s|next)', '', line.group('set').strip())).strip())):
                 attr, val = re.split(r'\s', i)[0], re.split(r'\s', i)[1:]
                 data[address_obj_name][attr] = val
-        print(data)
-        #return data
+        #print(data)
+        return data
 
     def parse_addrgrp(self, db: mysql.connector.cursor, content: str) -> None:
         addrgrp_reg = r'(?P<addrgrp>.*addrgrp(.*\n)*?.*end)'
@@ -137,7 +137,6 @@ class fortinet:
                 print(i)
                 #TODO insert data into DB table `group` & pip install mysqldb
                 #check addrgrp member in address object, if not in pass it
-
                 #if re.match(r'^\d', i):
                     #ip, mask = re.split(r'\/', i)
                 
@@ -153,7 +152,6 @@ def main():
             forti.insert_vlan(db, content, fw_name, vdom_name)
             forti.insert_firewall_policy(db, content, fw_name, vdom_name)
         print(f'Parsing \"{fw_name}\" config is finished.\n')
-
         #forti.parse_firewall_policy(content)
         #forti.parse_config(content, 'syszone', 'ECC_DMZ')
 
