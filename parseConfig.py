@@ -16,7 +16,7 @@ add_vlan_statement = ("INSERT INTO vlan (fwid, vdom, vname, network, cidr, vorde
 add_policy_statement = ("INSERT INTO {} (fwid, vlanfrom, vlanto, userid, adminid, src, dst, service, comment, addtime, nat) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)")
 
 class fortinet:
-    def parse_config(self, content: str, block_name: str, vdom_name: str) -> dict:
+    def parse_config(self, content: str, block_name: str, *args) -> dict:
         block_reg = ''
         content_reg = ''
         group = ''
@@ -30,7 +30,7 @@ class fortinet:
             case 'syszone':
                 block_reg = r'(?P<syszone>.*system\szone(.*\n)*?.*(?<=next\n)end)'
                 content_reg = r'(?P<zone>\".*\")(?P<set>(.*\n)*?.*next)'
-                content = re.search(r'(?P<vdom>(config\svdom\sedit\s{})(.*\n)*?end\nend)'.format(vdom_name), content).group('vdom') if len(re.findall(r'.*system\szone', content)) > 1 else content
+                content = re.search(r'(?P<vdom>(config\svdom\sedit\s{})(.*\n)*?end\nend)'.format(*args), content).group('vdom') if len(re.findall(r'.*system\szone', content)) > 1 else content
                 group = 'zone'
 
         if re.search(block_reg, content) is not None :
@@ -41,7 +41,7 @@ class fortinet:
                     data[keys][attr] = val
             return data
         else:
-            print(f'No ZONE config in vdom \"{vdom_name}\"')
+            return False
 
     def parse_firewall_policy(self, content: str, vdom_name: str) -> dict:
         fwpolicy_block_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
@@ -58,26 +58,38 @@ class fortinet:
                     data[policy_id][attr] = val
         return(data)
 
-    def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str) -> None:
-        interfcae_dict = self.parse_config(content, 'sysintf', vdom_name)
+    def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str, default_zone_name: str) -> None:
+        interfcae_dict = self.parse_config(content, 'sysintf')
         zone_dict = self.parse_config(content, 'syszone', vdom_name)
         order = 0
     
-        for zone, zone_attr in zone_dict.items():
-            if 'interface' in zone_attr:
-                for intf in zone_attr['interface']:
-                    #{'vdom', 'ip'} <= (interfcae_dict[interface]).keys():
-                    if intf in interfcae_dict and all(k in interfcae_dict[intf] for k in ('vdom', 'ip')):
-                        #print(intf, interfcae_dict[intf]['vdom'][0], interfcae_dict[intf]['ip'])
-                        order += 1
-                        address, netmask = re.split(r'\/', str(IPv4Network('/'.join(ip_mask for ip_mask in interfcae_dict[intf]['ip']), False)))
-                        vdom =  interfcae_dict[intf]['vdom'][0]
-                        data_vlan = (fw_name, vdom, zone, address, int(netmask), order)
-                        #db.execute(add_vlan_statement, data_vlan)
+        if not zone_dict:
+            print(f'No ZONE config in vdom \"{vdom_name}\"')
+        else:
+            for zone, zone_attr in zone_dict.items():
+                if 'interface' in zone_attr:
+                    for intf in zone_attr['interface']:
+                        #{'vdom', 'ip'} <= (interfcae_dict[interface]).keys():
+                        if intf in interfcae_dict and all(k in interfcae_dict[intf] for k in ('vdom', 'ip')):
+                            #print(intf, interfcae_dict[intf]['vdom'][0], interfcae_dict[intf]['ip'])
+                            order += 1
+                            address, netmask = re.split(r'\/', str(IPv4Network('/'.join(ip_mask for ip_mask in interfcae_dict[intf]['ip']), False)))
+                            vdom =  interfcae_dict[intf]['vdom'][0]
+                            data_vlan = (fw_name, vdom, zone, address, int(netmask), order)
+                            try:
+                                db.execute(add_vlan_statement, data_vlan)
+                            except mysql.connector.Error as e:
+                                print(e)
+            print(f'Data insert into table \"vlan\" is finished.')
+         
         order += 1
-        default = (fw_name, vdom_name, '', '0.0.0.0', '0', order)
-        #db.execute(add_vlan_statement, default)
-        print(f'Data insert into table \"vlan\" is finished.')   
+        default = (fw_name, vdom_name, default_zone_name, '0.0.0.0', '0', order)
+        try:
+            db.execute(add_vlan_statement, default)
+            print(f'Add default vlan into table \"vlan\" is finished.')
+        except mysql.connector.Error as e:
+            print(e)
+
 
     def insert_firewall_policy(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str) -> None:
         policy_dict = self.parse_firewall_policy(content, vdom_name)
@@ -105,7 +117,10 @@ class fortinet:
                 comments = re.sub(r'\"', '', v.get('comments')) if 'comments' in v else ''
                 #print(f'{k}, {srcintf}, {dstintf}, {srcaddr}, {dstaddr}, {service}, {comments}')
                 data_policy = (int(k), srcintf, dstintf, '', '', srcaddr, dstaddr, service, comments, current_time, None)
-                db.execute(add_policy_statement.format(fw_name), data_policy)
+                try:
+                    db.execute(add_policy_statement.format(fw_name), data_policy)
+                except mysql.connector.Error as e:
+                    print(e)
         print(f'Data insert into table \"{fw_name}\" is finished.')
                                 
     def parse_firewall_address(self, content: str) -> dict:
@@ -143,13 +158,13 @@ class fortinet:
 def main():
     database = dbsetup.database()
     for k,v in json.loads(os.getenv("FW")).items():
-        fw_name, config_path, vdom_name = k, v.get('config'), v.get('vdom')
+        fw_name, config_path, vdom_name, default_zone_name = k, v.get('config'), v.get('vdom'), v.get('default_zone')
         with database as db:
             with open(config_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             forti = fortinet()
             print(f'Starting parse \"{fw_name}\" config.')
-            forti.insert_vlan(db, content, fw_name, vdom_name)
+            forti.insert_vlan(db, content, fw_name, vdom_name, default_zone_name)
             forti.insert_firewall_policy(db, content, fw_name, vdom_name)
         print(f'Parsing \"{fw_name}\" config is finished.\n')
         #forti.parse_firewall_policy(content)
