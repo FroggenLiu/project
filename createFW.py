@@ -8,7 +8,7 @@ add_fw_statement = ("INSERT INTO fwinfo (fwid, vdom, name, ip, account, pw, ftyp
 create_table_statment = (
     "CREATE TABLE {} (`fwid` int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY, `vlanfrom` varchar(50) NOT NULL, `vlanto` varchar(50) NOT NULL,"
     "`userid` varchar(50) NOT NULL, `adminid` varchar(50) NOT NULL, `src` text NOT NULL, `dst` text NOT NULL, `service` text NOT NULL,"
-    "`comment` longtext NOT NULL, `addtime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, `nat` varchar(50)) ENGINE=InnoDB"
+    "`comment` longtext, `addtime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, `nat` varchar(50)) ENGINE=InnoDB"
     )
 
 def add_fw_info(db: "db object"):
