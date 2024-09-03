@@ -25,7 +25,6 @@ del_vlan_statment = ("DELETE FROM vlan WHERE (fwid, vdom) IN ((\'{}\',\'{}\'))")
 
 class fortinet:
     def parse_config(self, content: str, block_name: str, *args) -> dict:
-    def parse_config(self, content: str, block_name: str, *args) -> dict:
         block_reg = ''
         content_reg = ''
         group = ''
@@ -40,9 +39,8 @@ class fortinet:
                 block_reg = r'(?P<syszone>.*system\szone(.*\n)*?.*(?<=next\n)end)'
                 content_reg = r'(?P<zone>\".*\")(?P<set>(.*\n)*?.*next)'
                 content = re.search(r'(?P<vdom>(config\svdom\sedit\s{})(.*\n)*?end\nend)'.format(*args), content).group('vdom') if len(re.findall(r'.*system\szone', content)) > 1 else content
-                content = re.search(r'(?P<vdom>(config\svdom\sedit\s{})(.*\n)*?end\nend)'.format(*args), content).group('vdom') if len(re.findall(r'.*system\szone', content)) > 1 else content
                 group = 'zone'
-
+                
         if re.search(block_reg, content) is not None :
             for line in re.finditer(content_reg, re.search(block_reg, content).group(block_name)):
                 keys = re.sub(r'\"', '', line.group(group).strip())
@@ -52,7 +50,7 @@ class fortinet:
             return data
         else:
             return False
-            return False
+
 
     def parse_firewall_policy(self, content: str, vdom_name: str) -> dict:
         fwpolicy_block_reg = r'(?P<fw>.*firewall\spolicy(.*\n)*?.*end)'
@@ -69,8 +67,7 @@ class fortinet:
                     data[policy_id][attr] = val
         return(data)
 
-    def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str, default_zone_name: str) -> None:
-        interfcae_dict = self.parse_config(content, 'sysintf')
+
     def insert_vlan(self, db: mysql.connector.cursor, content: str, fw_name: str, vdom_name: str, default_zone_name: str) -> None:
         interfcae_dict = self.parse_config(content, 'sysintf')
         zone_dict = self.parse_config(content, 'syszone', vdom_name)
@@ -100,13 +97,6 @@ class fortinet:
             print(f'Data insert into table \"vlan\" is finished.')
          
         order += 1
-        default = (fw_name, vdom_name, default_zone_name, '0.0.0.0', '0', order)
-        try:
-            db.execute(add_vlan_statement, default)
-            print(f'Add default vlan into table \"vlan\" is finished.')
-        except mysql.connector.Error as e:
-            print(e)
-
         default = (fw_name, vdom_name, default_zone_name, '0.0.0.0', '0', order)
         try:
             db.execute(add_vlan_statement, default)
@@ -184,7 +174,8 @@ class fortinet:
                 #check addrgrp member in address object, if not in pass it
                 #if re.match(r'^\d', i):
                     #ip, mask = re.split(r'\/', i)
-                
+
+
 def main():
     database = dbsetup.database()
     for k,v in json.loads(os.getenv("FW")).items():
@@ -202,6 +193,7 @@ def main():
         print(f'Parsing \"{fw_name}\" config is finished.\n')
         #forti.parse_firewall_policy(content)
         #forti.parse_config(content, 'syszone', 'ECC_DMZ')
+
 
 if __name__ == "__main__":
     main()

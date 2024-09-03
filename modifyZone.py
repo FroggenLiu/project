@@ -87,8 +87,9 @@ def modify_zone(db: 'db object', content: str, fw_name: str, default_zone_name: 
 
 def main():
     database = dbsetup.database()
-    for k,v in json.loads(os.getenv('MODIFY_ZONE')).items():
+    for k,v in json.loads(os.getenv('FW')).items():
         fw_name, config_path, default_zone_name = k, v.get('config'), v.get('default_zone')
+        print(fw_name, config_path, default_zone_name)
         with database as db:
             with open(config_path, 'r', encoding='utf-8') as f:
                 content = f.read()
